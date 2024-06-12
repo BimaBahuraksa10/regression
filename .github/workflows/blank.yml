@@ -1,0 +1,99 @@
+#Import library
+import numpy as np
+import plotly.express as px
+import pandas as pd
+from pandas_datareader import wb
+import matplotlib.pyplot as plt
+import scipy.stats as stats
+import statsmodels.api as sm
+
+#Input data dengan API dari World Bank 
+gdp_per_capita = "NY.GDP.PCAP.PP.CD"
+current_health_expenditure_per_capita = "SH.XPD.CHEX.PP.CD"
+number_of_neonatal_deaths = "SH.DTH.NMRT"
+account_ownership = "FX.OWN.TOTL.ZS"
+
+#Data cleaning
+pd.set_option('display.max_rows', None)
+df=wb.download(indicator=[gdp_per_capita,current_health_expenditure_per_capita,number_of_neonatal_deaths,account_ownership],
+               country="all",start=2014,end=2014)
+df.columns=["GDP per Capita, PPP (Current International $)","Current Health Expenditure per Capita, PPP (Current International $)",
+            "Number of Neonatal Deaths",
+            "Account Ownership at a Financial Institution or with a Mobile-money-service Provider (% of Population Ages 15+)"]
+dfa=df.dropna()
+dfa.head(10)
+dfa[['GDP per Capita, PPP (Current International $)', 
+'Current Health Expenditure per Capita, PPP (Current International $)', 'Number of Neonatal Deaths',	
+'Account Ownership at a Financial Institution or with a Mobile-money-service Provider (% of Population Ages 15+)']] = dfa[['GDP per Capita, PPP (Current International $)', 'Current Health Expenditure per Capita, PPP (Current International $)', 'Number of Neonatal Deaths',	'Account Ownership at a Financial Institution or with a Mobile-money-service Provider (% of Population Ages 15+)']].apply(pd.to_numeric, errors='coerce').fillna(0).astype(int)
+dfb = dfa.reset_index()
+dfb.head(10)
+dfc = dfb.iloc[20:]
+df_log = dfc.copy()
+df_log[df_log.columns[2:]] = np.log(dfc[dfc.columns[2:]])
+df_log.head(10)
+
+#Visualisasi data 
+#GDP per capita terbesar
+fig, ax = plt.subplots(figsize=(3,6))
+ax.grid(which="major", axis='x', color='#758D99', alpha=0.6, zorder=1)
+ax.spines[['top','right','bottom']].set_visible(False)
+ax.spines['left'].set_linewidth(1.1)
+ax.spines['left'].set_linewidth(1.1)
+gdp_bar = dfc.sort_values(by = "GDP per Capita, PPP (Current International $)", ascending = True).tail(9)
+ax.barh(gdp_bar["country"], gdp_bar["GDP per Capita, PPP (Current International $)"], color='#006BA2', zorder=2)
+ax.set_xticklabels([0, 25, 50, 75, 100])
+ax.xaxis.set_tick_params(labeltop=True,     
+                         labelbottom=False,  
+                         bottom=False,       
+                         labelsize=11,       
+                         pad=-1)       
+ax.set_yticklabels(gdp_bar['country'],     
+                   ha = 'left')              
+ax.yaxis.set_tick_params(pad=130,            
+                         labelsize=11,       
+                         bottom=False)       
+ax.set_ylim(-0.5, 8.5)
+ax.plot([-.48, .87],                 
+        [1.02, 1.02],                
+        transform=fig.transFigure,   
+        clip_on=False,
+        color='#E3120B',
+        linewidth=.6)
+ax.add_patch(plt.Rectangle((-.48,1.02),                
+                           0.12,                       
+                           -0.02,                      
+                           facecolor='#E3120B',
+                           transform=fig.transFigure,
+                           clip_on=False,
+                           linewidth = 0))
+ax.text(x=-.48, y=.96, s="GDP Per Capita", transform=fig.transFigure, ha='left', fontsize=13, weight='bold', alpha=.8)
+ax.text(x=-.48, y=.925, s="Top 9 Countries with Highest GDP per Capita in 2014 (Thousand $)", transform=fig.transFigure, ha='left', fontsize=11, alpha=.8)
+
+#Menampilkan scatter plot
+fig1=px.scatter(df_log, x="Current Health Expenditure per Capita, PPP (Current International $)",y="GDP per Capita, PPP (Current International $)",trendline="ols")
+fig2=px.scatter(df_log, x="Number of Neonatal Deaths",y="GDP per Capita, PPP (Current International $)", trendline="ols")
+fig3=px.scatter(df_log, x="Account Ownership at a Financial Institution or with a Mobile-money-service Provider (% of Population Ages 15+)",y="GDP per Capita, PPP (Current International $)",trendline="ols")
+
+fig1.show()
+fig2.show()
+fig3.show()
+
+#Melihat korelasi data menggunakan Pearson
+df_log_numeric = df_log.select_dtypes(include=[np.number])
+correlation_matrix = df_log_numeric.corr(method='pearson')
+correlation_matrix
+
+#Melihat hasil regresi
+X = df_log[["Current Health Expenditure per Capita, PPP (Current International $)","Number of Neonatal Deaths",
+            "Account Ownership at a Financial Institution or with a Mobile-money-service Provider (% of Population Ages 15+)"]]
+Y = df_log["GDP per Capita, PPP (Current International $)"]
+X = sm.add_constant(X)
+model = sm.OLS(Y, X).fit()
+predictions = model.predict(X)
+print(model.summary())
+
+#Sumber data
+ax.text(x=-.35, y=.08, s="""Source: World Bank Data""", transform=fig.transFigure, ha='left', fontsize=9, alpha=.7)
+
+
+*Sumber kode = https://towardsdatascience.com/making-economist-style-plots-in-matplotlib-e7de6d679739
